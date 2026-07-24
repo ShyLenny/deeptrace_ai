@@ -1,16 +1,18 @@
 <div align="center">
 
-# DeepProof AI
+# DeepTrace AI
+
 ### AI-Powered Multimodal Deepfake Detection & Context Verification using Gemma 4
 
-> "Don't just detect fake content. Verify the truth behind it."
+**Verify Reality Before It Goes Viral.**
 
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
+*An AI-powered investigation platform that detects deepfakes, verifies context, and explains the truth with evidence.*
+
 ![Gemma4](https://img.shields.io/badge/Powered%20By-Gemma%204-orange)
+![React](https://img.shields.io/badge/Frontend-React-61DAFB)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
-![React](https://img.shields.io/badge/React-Frontend-61DAFB)
-![Status](https://img.shields.io/badge/Status-Prototype-success)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
 
@@ -18,398 +20,105 @@
 
 # Overview
 
-DeepProof AI is an intelligent multimodal verification platform designed to combat the rapidly growing threat of AI-generated misinformation and deepfakes.
+DeepTrace AI is a multimodal AI verification platform built to combat **deepfakes** and **context-based misinformation**.
 
-Unlike traditional fact-checking tools that primarily focus on textual claims, DeepProof AI analyzes **images, audio, videos, and text simultaneously**, extracts factual claims using **Gemma 4**, cross-verifies them against trusted information sources, detects possible manipulation, and produces an evidence-backed authenticity report with confidence scoring.
-
-Instead of asking **"Is this image fake?"**, DeepProof AI answers the far more important question:
+Instead of simply asking **"Is this fake?"**, DeepTrace AI answers:
 
 > **"Can this content be trusted?"**
+
+By combining **Gemma 4's multimodal reasoning**, deepfake detection, and evidence retrieval from trusted sources, DeepTrace generates transparent verification reports backed by explainable AI.
 
 ---
 
 # The Problem
 
-The rise of generative AI has fundamentally changed how misinformation spreads.
+Modern misinformation is no longer limited to fake text.
 
-Modern misinformation rarely consists of completely fake content. Instead, it is often created by manipulating context rather than fabricating entire events.
+It increasingly relies on:
 
-Examples include:
+- Real images with false captions
+- AI-generated or manipulated videos
+- Voice-cloned audio
+- Reused media presented as recent events
+- Misleading social media posts
 
-- Authentic images shared with false captions
-- Old videos presented as recent incidents
-- AI-generated deepfake images
-- Voice-cloned political speeches
-- Edited interviews
-- Misleading translations
-- AI-generated social media posts
+Most existing tools analyze only one modality or simply classify media as fake.
 
-These forms of misinformation spread significantly faster than manual fact-checking processes and can influence:
-
-- Elections
-- Financial markets
-- Public opinion
-- Emergency response
-- Journalism
-- Brand reputation
-
-Current verification tools generally specialize in only one modality (text, image, or audio), leaving significant gaps in multimodal misinformation detection.
-
----
-
-# Why This Problem Matters
-
-The accessibility of generative AI has dramatically lowered the barrier to producing convincing fake content.
-
-Within minutes, anyone can generate:
-
-- Photorealistic fake images
-- Synthetic voices
-- AI-generated videos
-- Fabricated news reports
-- Misleading social media campaigns
-
-The challenge is no longer generating content.
-
-The challenge is **verifying authenticity at scale.**
-
-DeepProof AI addresses this need by combining multimodal reasoning, evidence retrieval, and explainable AI into a single verification pipeline.
+**DeepTrace AI verifies both authenticity *and* context.**
 
 ---
 
 # Our Solution
 
-DeepProof AI provides a unified verification platform capable of analyzing:
+Upload an **Image, Video, Audio, Text, or URL** and DeepTrace AI performs:
 
-- Images
-- Audio
-- Videos
-- Text
-- URLs
+1. Multimodal understanding using **Gemma 4**
+2. Claim extraction
+3. Deepfake detection
+4. Evidence retrieval from trusted sources
+5. Confidence scoring
+6. Explainable verification report
 
-The platform performs five major tasks:
+Every result includes supporting evidence—not just a binary prediction.
 
-1. Understands uploaded content using Gemma 4
-2. Extracts factual claims
-3. Detects possible manipulation
-4. Cross-references trusted information sources
-5. Generates an explainable verification report
+---
 
-Instead of simply labeling content as "Fake" or "Real", the platform provides:
+# Verification Pipeline
 
+```text
+Upload Media
+      │
+      ▼
+Gemma 4 Reasoning
+      │
+Claim Extraction
+      │
+Deepfake Detection
+      │
+Trusted Evidence Search
+      │
+Context Verification
+      │
+Confidence Score
+      │
+Evidence-backed Report
+```
+
+---
+
+# Key Features
+
+- Image, Audio, Video & Text Verification
+- AI Deepfake Detection
+- Context & Claim Verification
+- Trusted Source Citations
 - Confidence Score
 - Evidence Timeline
-- Supporting Sources
-- Contradicting Sources
-- Reasoning Process
-- Risk Level
-- Manipulation Indicators
+- Explainable AI Reasoning
 
 ---
 
 # Why Gemma 4?
 
-Gemma 4 serves as the reasoning engine powering DeepProof AI.
+Gemma 4 serves as the reasoning engine behind DeepTrace AI.
 
-Rather than acting as a conversational chatbot, Gemma 4 performs structured multimodal reasoning throughout the verification pipeline.
+It is responsible for:
 
-## Gemma 4 Responsibilities
-
-### Image Understanding
-
-Gemma 4 identifies:
-
-- Objects
-- Scenes
-- Landmarks
-- Text inside images (OCR)
-- Visual inconsistencies
-- Contextual clues
-
-Example:
-
-Input Image:
-
-"Earthquake in Tokyo Today"
-
-Gemma extracts:
-
-```
-Detected Scene:
-Urban street
-Collapsed buildings
-Japanese text
-Emergency vehicles
-
-Possible Claim:
-Earthquake occurred in Tokyo today.
-```
-
----
-
-### Audio Understanding
-
-Gemma processes speech transcripts to identify factual statements.
-
-Example:
-
-Audio:
-
-"The government announced free electricity nationwide."
-
-Gemma extracts:
-
-```
-Claim:
-Government announced free electricity.
-
-Verification Required:
-- Which government?
-- Official announcement?
-- Date?
-- Policy document?
-```
-
----
-
-### Contextual Reasoning
-
-Gemma compares extracted claims with retrieved evidence.
-
-Instead of simply searching keywords, it reasons over:
-
-- Time
-- Location
-- Event consistency
-- Entity relationships
-- Historical context
-
-This dramatically improves factual verification quality.
-
----
-
-### Explainability
-
-One of the primary goals of DeepProof AI is transparency.
-
-Gemma generates human-readable explanations describing why content has been classified as trustworthy or misleading.
-
-Example:
-
-```
-Confidence: 18%
-
-Reason:
-
-The uploaded image is authentic.
-
-However,
-this exact image first appeared in 2019 during flooding in Indonesia.
-
-No trusted sources report a similar incident in Delhi today.
-
-Conclusion:
-
-Likely Misleading Context
-```
-
----
-
-# System Architecture
-
-```
-                    User Upload
-                         │
-        ┌────────────────────────────────┐
-        │                                │
-   Image / Audio / Video / Text
-        │
-        ▼
-    Preprocessing Layer
-        │
-        ▼
-    Gemma 4 Multimodal Reasoning
-        │
-        ├──────────────┐
-        │              │
- Claim Extraction   Context Analysis
-        │              │
-        └──────┬───────┘
-               ▼
-    Deepfake Detection Models
-               │
-               ▼
- Trusted Evidence Retrieval Engine
-               │
-               ▼
- Evidence Ranking & Cross Verification
-               │
-               ▼
- Confidence Scoring Engine
-               │
-               ▼
- Explainable Verification Report
-```
-
----
-
-# Technical Approach
-
-## Frontend
-
-- React
-- TailwindCSS
-- Framer Motion
-
-Provides an intuitive interface for uploading media and viewing verification reports.
-
----
-
-## Backend
-
-- FastAPI
-- Python
-
-Responsible for:
-
-- File processing
-- AI orchestration
-- API management
-- Verification pipeline
-
----
-
-## AI Layer
-
-The AI pipeline consists of multiple specialized components.
-
-### Gemma 4
-
-Primary reasoning model responsible for:
-
+- Multimodal content understanding
 - Claim extraction
-- Multimodal understanding
 - Context analysis
-- Evidence summarization
-- Final explanation generation
+- Evidence reasoning
+- Human-readable explanations
 
----
-
-### Deepfake Detection
-
-Specialized models detect manipulation across media.
-
-Image:
-
-- Vision Transformer
-- EfficientNet
-
-Audio:
-
-- Whisper
-- Audio forgery classifier
-
-Video:
-
-- Frame-level anomaly detection
-
----
-
-### Retrieval-Augmented Verification
-
-After extracting factual claims, the system retrieves supporting evidence from trusted knowledge sources including:
-
-- Government publications
-- Fact-checking databases
-- News agencies
-- Public datasets
-- Historical archives
-
-Gemma evaluates retrieved evidence before generating the final report.
-
----
-
-# Verification Workflow
-
-```
-Upload Content
-
-        ↓
-
-Gemma 4 understands content
-
-        ↓
-
-Claims extracted
-
-        ↓
-
-Evidence retrieved
-
-        ↓
-
-Deepfake detection
-
-        ↓
-
-Cross-reference analysis
-
-        ↓
-
-Confidence score generated
-
-        ↓
-
-Explainable report delivered
-```
-
----
-
-# Features
-
-✅ Multimodal Verification
-
-Supports images, audio, videos and text.
-
----
-
-✅ Deepfake Detection
-
-Detects AI-generated and manipulated media.
-
----
-
-✅ Context Verification
-
-Determines whether authentic media is being shared with false context.
-
----
-
-✅ Explainable AI
-
-Every decision is accompanied by reasoning and supporting evidence.
-
----
-
-✅ Confidence Score
-
-Generates an overall authenticity score based on retrieved evidence.
-
----
-
-✅ Source Attribution
-
-Every verification report references supporting sources used during reasoning.
+Rather than acting as a chatbot, Gemma functions as an **AI investigator**.
 
 ---
 
 # Example Output
 
-```
-Verification Report
-
+```text
 Claim:
-"This image shows a recent earthquake in Japan."
+"This image shows an earthquake in Japan today."
 
 Status:
 Likely Misleading
@@ -418,102 +127,52 @@ Confidence:
 14%
 
 Evidence:
+✓ Image first appeared in 2018
+✓ No recent earthquake reports
+✓ Reuters archive contains identical image
 
-✔ Image originally published in 2018
-
-✔ No matching earthquake reports
-
-✔ Similar image archived by Reuters
-
-Reason:
-
-The uploaded image is authentic,
-however it has been reused with a fabricated context.
-
-Recommendation:
-
-Do not share without verification.
+Conclusion:
+Authentic image, fabricated context.
 ```
-
----
-
-# Innovation
-
-DeepProof AI goes beyond traditional fake-content detection.
-
-Instead of asking:
-
-> "Is this image AI-generated?"
-
-we ask:
-
-> "Is the entire story being presented truthful?"
-
-This distinction enables detection of one of the most common forms of misinformation:
-
-**Real content used with fabricated context.**
-
----
-
-# Potential Impact
-
-DeepProof AI can support multiple industries including:
-
-- Journalism
-- Government agencies
-- Social media moderation
-- Cybersecurity
-- Law enforcement
-- Educational institutions
-- Corporate brand protection
-
-The long-term vision is to build an AI-powered trust layer for digital information.
-
----
-
-# Future Roadmap
-
-- Browser Extension
-- WhatsApp Verification Bot
-- Telegram Fact Checker
-- Public REST API
-- Enterprise Dashboard
-- Live News Verification
-- Election Monitoring
-- Real-Time Social Media Verification
-- Mobile Application
 
 ---
 
 # Tech Stack
 
 | Layer | Technology |
-|----------|----------------|
-| Frontend | React + TailwindCSS |
+|--------|------------|
+| Frontend | React + Tailwind CSS |
 | Backend | FastAPI |
 | AI Reasoning | Gemma 4 |
-| Speech Recognition | Whisper |
-| Vision Models | ViT, EfficientNet |
+| Speech | Whisper |
+| Vision | ViT + EfficientNet |
 | Database | PostgreSQL / Supabase |
-| Storage | Firebase |
-| Deployment | Docker + Vercel |
 
 ---
 
-# Project Vision
+# Target Applications
 
-As AI-generated media becomes increasingly indistinguishable from authentic content, the internet requires a scalable trust infrastructure.
-
-DeepProof AI aims to become that infrastructure.
-
-Our vision is to build an explainable, evidence-driven verification platform capable of helping individuals, organizations, and governments make informed decisions in an era dominated by synthetic media.
-
-Because in the age of AI,
-
-**Trust should be verified—not assumed.**
+- News Organizations
+- Government Agencies
+- Law Enforcement
+- Social Media Platforms
+- Enterprises
+- Educational Institutions
 
 ---
 
-# Team
+# Vision
 
-Built with ❤️ using **Gemma 4** to make digital information more trustworthy.
+DeepTrace AI aims to become the **verification layer of the internet**—helping people and organizations verify digital information before it spreads.
+
+As AI-generated media becomes increasingly convincing, trust should be **earned through evidence**, not assumptions.
+
+---
+
+<div align="center">
+
+### Built using **Gemma 4**
+
+**Trust. Verify. Explain.**
+
+</div>
