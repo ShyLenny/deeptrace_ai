@@ -4,6 +4,8 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { isFirebaseConfigured } from "@/lib/firebase";
+import { saveUserProfile } from "@/lib/firebase/db";
 
 export interface UserDetails {
   id: string;
@@ -135,6 +137,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearError = () => setError(null);
+
+  // Mirror the signed-in Supabase user into the Firestore `users` collection so
+  // audit history has a profile to join against. Best-effort: a Firestore
+  // outage or missing config must never block the session.
+  useEffect(() => {
+    if (!user || !isFirebaseConfigured) return;
+
+    saveUserProfile({
+      uid: user.id,
+      email: user.email ?? "",
+      displayName:
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split("@")[0] ||
+        "User",
+      createdAt: user.created_at ?? new Date(),
+      lastActive: new Date(),
+    }).catch((err) => {
+      console.error("Failed to sync user profile to Firestore:", err);
+    });
+  }, [user]);
 
   const value: AuthContextType = {
     user,

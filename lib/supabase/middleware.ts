@@ -13,7 +13,6 @@ export async function updateSession(request: NextRequest) {
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRreXZhY2pvbGtjYmt4b3l0cW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NzMwOTksImV4cCI6MjEwMDQ0OTA5OX0.6rf4MXvgImJA9Roa06GEFHAOoq4VWlaTs74M5iYAqTw";
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-  const isAuthCallback = request.nextUrl.pathname.startsWith("/auth");
 
   // Check if any Supabase auth cookie is present before making network call
   const allCookies = request.cookies.getAll();
@@ -54,13 +53,6 @@ export async function updateSession(request: NextRequest) {
       console.error("Middleware getUser exception:", e);
       user = null;
     }
-  }
-
-  if (!user && !isLoginPage && !isAuthCallback) {
-    // Unauthenticated users attempting to access protected routes redirect to /login
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
   }
 
   if (user && isLoginPage) {
