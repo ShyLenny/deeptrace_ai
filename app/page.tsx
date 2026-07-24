@@ -5,6 +5,8 @@ import { Vectors } from "@/components/vectors";
 import { Architecture } from "@/components/architecture";
 import { SiteFooter } from "@/components/site-footer";
 
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   return (
     <>
