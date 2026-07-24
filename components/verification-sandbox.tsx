@@ -14,13 +14,18 @@ import {
   Loader2,
   Save,
   ScanSearch,
+  Newspaper,
+  FileJson,
+  ShieldCheck,
+  ShieldAlert,
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { saveAuditReport } from "@/lib/firebase/db";
 import { uploadVerificationMedia } from "@/lib/firebase/storage";
-import { formatBytes, isVideo } from "@/lib/media";
+import { formatBytes } from "@/lib/media";
 import { UploadDropzone, type SelectedMedia } from "@/components/upload-dropzone";
 import type { Citation, NewAuditReport, Verdict } from "@/lib/types/firebase";
 
@@ -30,6 +35,22 @@ type SaveState = "idle" | "saving" | "saved" | "error" | "signed-out";
 
 type Claim = { field: string; extracted: string; claimed: string; status: "match" | "mismatch" };
 type Source = { domain: string; trust: number; date: string };
+
+type NewsArticle = {
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  snippet: string;
+};
+
+type FactCheckClaim = {
+  claim: string;
+  claimant: string;
+  rating: string;
+  publisher: string;
+  url: string;
+};
 
 type Result = {
   origin: "sample" | "live";
@@ -42,6 +63,9 @@ type Result = {
   sources: Source[];
   telemetry: { latency: string; model: string };
   audit?: NewAuditReport;
+  newsArticles?: NewsArticle[];
+  factCheckClaims?: FactCheckClaim[];
+  rawPayload?: any;
 };
 
 const TABS: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
@@ -50,58 +74,11 @@ const TABS: { id: TabId; label: string; icon: typeof ImageIcon }[] = [
   { id: "url", label: "Paste URL / Social Post", icon: Link2 },
 ];
 
-const VERDICT_META: Record<Verdict, { zone: Zone; label: string }> = {
+const VERDICT_META: Record<string, { zone: Zone; label: string }> = {
   AUTHENTIC: { zone: "authentic", label: "No Manipulation Detected" },
   CONTEXT_MISMATCH: { zone: "mismatch", label: "Context Mismatch Detected" },
   SUSPECTED_MANIPULATION: { zone: "manipulated", label: "Suspected Manipulation" },
 };
-
-const SAMPLES: (Result & { id: string; sampleLabel: string })[] = [
-  {
-    id: "event",
-    sampleLabel: "Load Sample: Out-of-Context Event",
-    origin: "sample",
-    mediaCaption: "IMG_04421.jpg",
-    mediaSub: "Crowd gathering · night · flares · stadium exterior",
-    verdict: { label: "Context Mismatch Detected", score: 87, zone: "mismatch" },
-    deepfakeProbability: 4,
-    claims: [
-      { field: "Location", extracted: "Estadio Metropolitano, Madrid (geolocated)", claimed: "“Riots erupt in Bucharest tonight”", status: "mismatch" },
-      { field: "Date", extracted: "March 2019 (EXIF + shadow analysis)", claimed: "“Happening right now”", status: "mismatch" },
-      { field: "Visual subject", extracted: "Football supporters, flare celebration", claimed: "Civil unrest / riot police clash", status: "mismatch" },
-      { field: "Image integrity", extracted: "No pixel-level manipulation found", claimed: "—", status: "match" },
-    ],
-    sources: [
-      { domain: "reuters.com", trust: 96, date: "2019-03-09" },
-      { domain: "marca.com", trust: 88, date: "2019-03-09" },
-      { domain: "gettyimages.com", trust: 91, date: "2019-03-09" },
-      { domain: "unverified-x-post.com", trust: 12, date: "2026-07-21" },
-    ],
-    telemetry: { latency: "340ms", model: "Gemma 4 · edge" },
-  },
-  {
-    id: "audio",
-    sampleLabel: "Load Sample: Manipulated Audio Translation",
-    origin: "sample",
-    mediaCaption: "voice_note_0032.wav",
-    mediaSub: "0:41 clip · single speaker · non-English source",
-    verdict: { label: "Translation Fabrication Detected", score: 92, zone: "manipulated" },
-    deepfakeProbability: 71,
-    claims: [
-      { field: "Source audio", extracted: "Speaker discusses local market prices", claimed: "“Official declares emergency measures”", status: "mismatch" },
-      { field: "Translation", extracted: "Direct transcription, verified dialect model", claimed: "Caption fabricates unrelated statement", status: "mismatch" },
-      { field: "Clip boundary", extracted: "Mid-sentence cut, waveform splice at 0:38", claimed: "Presented as complete statement", status: "mismatch" },
-      { field: "Voice consistency", extracted: "Single continuous speaker, no synthesis artifacts", claimed: "—", status: "match" },
-    ],
-    sources: [
-      { domain: "apnews.com", trust: 95, date: "2026-07-18" },
-      { domain: "un.org", trust: 98, date: "2026-07-19" },
-      { domain: "regional-news.gov", trust: 84, date: "2026-07-18" },
-      { domain: "viral-clip-repost.net", trust: 9, date: "2026-07-22" },
-    ],
-    telemetry: { latency: "410ms", model: "Gemma 4 · edge" },
-  },
-];
 
 const ZONE_STYLES: Record<Zone, { text: string; bar: string }> = {
   authentic: { text: "text-emerald-600 dark:text-emerald-500", bar: "bg-emerald-600 dark:bg-emerald-500" },
@@ -113,7 +90,7 @@ export function VerificationSandbox() {
   const { userDetails } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>("upload");
   const [result, setResult] = useState<Result | null>(null);
-  const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
+  const [activeResultTab, setActiveResultTab] = useState<"overview" | "news" | "factcheck">("overview");
 
   const [media, setMedia] = useState<SelectedMedia | null>(null);
   const [claimedContext, setClaimedContext] = useState("");
@@ -121,7 +98,6 @@ export function VerificationSandbox() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  /** Persists a completed report; failures surface in the UI but never block the verdict. */
   async function persistAudit(audit: NewAuditReport, file?: File) {
     if (!isFirebaseConfigured) {
       setSaveState("idle");
@@ -146,36 +122,13 @@ export function VerificationSandbox() {
     }
   }
 
-  function loadSample(sample: (typeof SAMPLES)[number]) {
-    setActiveSampleId(sample.id);
-    setAnalysisError(null);
-    setResult(sample);
-    void persistAudit({
-      claimText: sample.claims.map((c) => `${c.field}: ${c.claimed}`).join(" | "),
-      mediaUrl: sample.mediaCaption,
-      verdict:
-        sample.verdict.zone === "authentic"
-          ? "AUTHENTIC"
-          : sample.verdict.zone === "mismatch"
-            ? "CONTEXT_MISMATCH"
-            : "SUSPECTED_MANIPULATION",
-      confidenceScore: sample.verdict.score,
-      summary: `${sample.verdict.label} — ${sample.mediaSub}`,
-      citations: sample.sources.map((s) => ({
-        source_name: s.domain,
-        url: `https://${s.domain}`,
-        trust_score: s.trust,
-      })),
-    });
-  }
-
   async function runVerification() {
     if (!media || analyzing) return;
 
     setAnalyzing(true);
     setAnalysisError(null);
-    setActiveSampleId(null);
     setSaveState("idle");
+    setActiveResultTab("overview");
 
     try {
       const body = new FormData();
@@ -191,26 +144,31 @@ export function VerificationSandbox() {
         return;
       }
 
-      const meta = VERDICT_META[payload.verdict as Verdict] ?? VERDICT_META.CONTEXT_MISMATCH;
-      const citations: Citation[] = payload.citations ?? [];
+      // New Payload Structure
+      const fa = payload.forensicAnalysis || payload; // fallback for older mock
+      const meta = VERDICT_META[fa.verdict] ?? VERDICT_META.CONTEXT_MISMATCH;
+      const citations: Citation[] = fa.citations ?? [];
 
       const live: Result = {
         origin: "live",
         mediaCaption: media.file.name,
-        mediaSub: payload.mediaDescription ?? `${formatBytes(media.file.size)} · ${media.file.type}`,
-        verdict: { label: meta.label, score: payload.confidenceScore ?? 0, zone: meta.zone },
-        deepfakeProbability: payload.deepfakeProbability,
-        summary: payload.summary,
-        claims: payload.claims ?? [],
+        mediaSub: fa.mediaDescription ?? `${formatBytes(media.file.size)} · ${media.file.type}`,
+        verdict: { label: meta.label, score: fa.confidenceScore ?? 0, zone: meta.zone },
+        deepfakeProbability: fa.deepfakeProbability,
+        summary: fa.summary,
+        claims: fa.claims ?? [],
         sources: citations.map((c) => ({
           domain: c.source_name,
           trust: c.trust_score,
           date: "cited by model",
         })),
         telemetry: {
-          latency: payload.latencyMs ? `${payload.latencyMs}ms` : "—",
-          model: payload.model ?? "Gemini",
+          latency: fa.latencyMs ? `${fa.latencyMs}ms` : "—",
+          model: fa.model ?? "Gemini",
         },
+        newsArticles: payload.newsArticles ?? [],
+        factCheckClaims: payload.factCheckClaims ?? [],
+        rawPayload: payload
       };
 
       setResult(live);
@@ -218,9 +176,9 @@ export function VerificationSandbox() {
       void persistAudit(
         {
           claimText: claimedContext || "(no claim supplied)",
-          verdict: payload.verdict as Verdict,
-          confidenceScore: payload.confidenceScore ?? 0,
-          summary: payload.summary ?? "",
+          verdict: (fa.verdict as Verdict) || "CONTEXT_MISMATCH",
+          confidenceScore: fa.confidenceScore ?? 0,
+          summary: fa.summary ?? "",
           citations,
         },
         media.file
@@ -241,7 +199,6 @@ export function VerificationSandbox() {
       id="sandbox"
       className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
-      {/* Toolbar */}
       <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <div role="tablist" aria-label="Verification input type" className="flex flex-wrap gap-1">
           {TABS.map((tab) => {
@@ -267,29 +224,10 @@ export function VerificationSandbox() {
             );
           })}
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          {SAMPLES.map((sample) => (
-            <button
-              key={sample.id}
-              type="button"
-              onClick={() => loadSample(sample)}
-              className={cn(
-                "rounded-md border px-3 py-1.5 font-mono text-[11px] transition-colors",
-                activeSampleId === sample.id
-                  ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
-                  : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:text-slate-500 dark:hover:border-slate-700 dark:hover:text-slate-300"
-              )}
-            >
-              {sample.sampleLabel}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,300px)_1fr]">
-        {/* Input panel */}
-        <div className="border-b border-slate-200 p-4 dark:border-slate-800 lg:border-b-0 lg:border-r">
+        <div className="border-b border-slate-200 p-4 dark:border-slate-800 lg:border-b-0 lg:border-r flex flex-col h-full">
           {activeTab === "upload" ? (
             <>
               <UploadDropzone
@@ -305,7 +243,7 @@ export function VerificationSandbox() {
                 }}
               />
 
-              <div className="mt-3">
+              <div className="mt-3 flex-1">
                 <label
                   htmlFor="claimed-context"
                   className="block text-[11px] font-medium text-slate-700 dark:text-slate-300"
@@ -315,33 +253,29 @@ export function VerificationSandbox() {
                 </label>
                 <textarea
                   id="claimed-context"
-                  rows={2}
+                  rows={3}
                   value={claimedContext}
                   onChange={(e) => setClaimedContext(e.target.value)}
                   disabled={analyzing}
                   placeholder="e.g. Protest in Paris last night"
                   className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
-                <p className="mt-1 text-[10px] leading-relaxed text-slate-400 dark:text-slate-600">
-                  Adding the claim lets DeepTrace check the media against it, not just for
-                  manipulation.
-                </p>
               </div>
 
               <button
                 type="button"
                 onClick={runVerification}
                 disabled={!media || analyzing}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-slate-50 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-50 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 {analyzing ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Analyzing
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing Data...
                   </>
                 ) : (
                   <>
-                    <ScanSearch className="h-3.5 w-3.5" />
+                    <ScanSearch className="h-4 w-4" />
                     Run Verification
                   </>
                 )}
@@ -365,10 +299,6 @@ export function VerificationSandbox() {
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
                   {activeTab === "audio" ? "Audio verification" : "URL verification"}
                 </p>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
-                  Not available yet. Load a sample to see how it reports, or upload a photo or
-                  video to run a live check.
-                </p>
               </div>
               <button
                 type="button"
@@ -379,216 +309,183 @@ export function VerificationSandbox() {
               </button>
             </div>
           )}
-
-          {result && (
-            <dl className="mt-4 space-y-2 border-t border-slate-200 pt-4 font-mono text-[11px] dark:border-slate-800">
-              <div className="flex items-center justify-between">
-                <dt className="text-slate-500 dark:text-slate-500">Latency</dt>
-                <dd className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                  <Clock className="h-3 w-3" />
-                  {result.telemetry.latency}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-slate-500 dark:text-slate-500">Model</dt>
-                <dd className="flex items-center gap-1 truncate text-slate-700 dark:text-slate-300">
-                  <Cpu className="h-3 w-3 shrink-0" />
-                  {result.telemetry.model}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-slate-500 dark:text-slate-500">Source</dt>
-                <dd
-                  className={cn(
-                    "flex items-center gap-1",
-                    result.origin === "live"
-                      ? "text-emerald-600 dark:text-emerald-500"
-                      : "text-slate-500 dark:text-slate-500"
-                  )}
-                >
-                  <Radio className={cn("h-3 w-3", result.origin === "live" && "animate-blink")} />
-                  {result.origin === "live" ? "Live analysis" : "Sample data"}
-                </dd>
-              </div>
-              {saveState !== "idle" && (
-                <div className="flex items-center justify-between">
-                  <dt className="text-slate-500 dark:text-slate-500">History</dt>
-                  <dd>
-                    {saveState === "saving" && (
-                      <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Saving
-                      </span>
-                    )}
-                    {saveState === "saved" && (
-                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-500">
-                        <Save className="h-3 w-3" />
-                        Saved
-                      </span>
-                    )}
-                    {saveState === "signed-out" && (
-                      <a
-                        href="/login"
-                        className="text-indigo-600 underline underline-offset-2 dark:text-indigo-400"
-                      >
-                        Sign in to save
-                      </a>
-                    )}
-                    {saveState === "error" && (
-                      <span className="flex items-center gap-1 text-rose-600 dark:text-rose-500">
-                        <TriangleAlert className="h-3 w-3" />
-                        Not saved
-                      </span>
-                    )}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          )}
         </div>
 
         {/* Results panel */}
-        <div className="p-4 sm:p-6">
+        <div className="p-0 bg-slate-50/50 dark:bg-slate-900/50 min-h-[500px]">
           {!result ? (
-            <div className="flex h-full min-h-[18rem] flex-col items-center justify-center gap-3 text-center">
-              <ScanSearch className="h-8 w-8 text-slate-300 dark:text-slate-700" strokeWidth={1.5} />
-              <div className="max-w-xs">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  No verification yet
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
-                  Upload a photo or video and run a verification, or load one of the samples to
-                  see a completed forensic report.
-                </p>
-              </div>
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center p-6">
+              {analyzing ? (
+                <>
+                  <Loader2 className="h-10 w-10 text-indigo-500 animate-spin mb-2" strokeWidth={1.5} />
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    DeepTrace AI is analyzing the content...
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 max-w-xs">
+                    Fetching global news context, running forensic metadata scans, and cross-checking the Google Fact Check Database.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <ScanSearch className="h-8 w-8 text-slate-300 dark:text-slate-700" strokeWidth={1.5} />
+                  <div className="max-w-xs">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      No verification yet
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+                      Upload a photo or video and run a verification to see a comprehensive forensic report.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
-            <>
-              {/* Confidence meter */}
-              <div className="mb-6">
-                <div className="mb-2 flex items-baseline justify-between gap-3">
-                  <span className={cn("text-sm font-semibold", zoneStyle!.text)}>
-                    {result.verdict.label}
-                  </span>
-                  <span className={cn("font-mono text-2xl font-semibold tabular", zoneStyle!.text)}>
-                    {result.verdict.score}%
-                  </span>
-                </div>
-                <div className="relative h-2 w-full overflow-hidden rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 opacity-90">
-                  <div
-                    className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded-full bg-slate-900 shadow-[0_0_0_2px_white] dark:bg-white dark:shadow-[0_0_0_2px_theme(colors.slate.950)]"
-                    style={{ left: `calc(${result.verdict.score}% - 2px)` }}
-                    aria-hidden
-                  />
-                </div>
-                <div className="mt-1.5 flex justify-between font-mono text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-600">
-                  <span>Authentic</span>
-                  <span>Context Mismatch</span>
-                  <span>Manipulated</span>
-                </div>
+            <div className="h-full flex flex-col">
+              {/* Tab Navigation for Results */}
+              <div className="flex border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 pt-4 space-x-6 overflow-x-auto">
+                <button
+                  onClick={() => setActiveResultTab('overview')}
+                  className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeResultTab === 'overview' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                  <Cpu className="w-4 h-4" /> Overview
+                  {activeResultTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-t-full" />}
+                </button>
+                <button
+                  onClick={() => setActiveResultTab('news')}
+                  className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeResultTab === 'news' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                  <Newspaper className="w-4 h-4" /> Related News
+                  <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 py-0.5 px-2 rounded-full text-[10px]">{result.newsArticles?.length || 0}</span>
+                  {activeResultTab === 'news' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-t-full" />}
+                </button>
+                <button
+                  onClick={() => setActiveResultTab('factcheck')}
+                  className={`pb-3 text-sm font-medium transition-colors relative whitespace-nowrap flex items-center gap-2 ${activeResultTab === 'factcheck' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Fact Checks
+                  <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 py-0.5 px-2 rounded-full text-[10px]">{result.factCheckClaims?.length || 0}</span>
+                  {activeResultTab === 'factcheck' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-t-full" />}
+                </button>
               </div>
 
-              {result.summary && (
-                <p className="mb-6 rounded-md border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                  {result.summary}
-                </p>
-              )}
-
-              {typeof result.deepfakeProbability === "number" && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-500">
-                    <span>Deepfake probability</span>
-                    <span className="font-mono tabular text-slate-700 dark:text-slate-300">
-                      {result.deepfakeProbability}%
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className={cn("h-full rounded-full", zoneStyle!.bar)}
-                      style={{ width: `${result.deepfakeProbability}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Claim breakdown */}
-              {result.claims.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-500">
-                    Claim Breakdown — Extracted vs. Claimed
-                  </h3>
-                  <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800">
-                    <table className="w-full border-collapse text-left text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-950">
-                          <th scope="col" className="px-3 py-2 font-medium text-slate-500 dark:text-slate-500">Field</th>
-                          <th scope="col" className="px-3 py-2 font-medium text-slate-500 dark:text-slate-500">Extracted (media)</th>
-                          <th scope="col" className="px-3 py-2 font-medium text-slate-500 dark:text-slate-500">Claimed</th>
-                          <th scope="col" className="w-8 px-3 py-2" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.claims.map((claim, i) => (
-                          <tr key={`${claim.field}-${i}`} className="border-t border-slate-200 dark:border-slate-800">
-                            <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{claim.field}</td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{claim.extracted}</td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{claim.claimed}</td>
-                            <td className="px-3 py-2">
-                              {claim.status === "match" ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-500" aria-label="Consistent" />
-                              ) : (
-                                <TriangleAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500" aria-label="Mismatch" />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Sources */}
-              <div>
-                <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-500">
-                  Cited Web Sources
-                </h3>
-                {result.sources.length === 0 ? (
-                  <p className="rounded-md border border-slate-200 px-3 py-2.5 text-xs leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-500">
-                    No external sources cited. This verdict comes from analysis of the media
-                    itself — cross-referencing against live web sources is not enabled on this
-                    request.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {result.sources.map((source) => (
+              {/* Scrollable Content Area */}
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+                {activeResultTab === 'overview' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div className="mb-2 flex items-baseline justify-between gap-3">
+                      <span className={cn("text-sm font-semibold", zoneStyle!.text)}>
+                        {result.verdict.label}
+                      </span>
+                      <span className={cn("font-mono text-2xl font-semibold tabular", zoneStyle!.text)}>
+                        {result.verdict.score}%
+                      </span>
+                    </div>
+                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 opacity-90">
                       <div
-                        key={source.domain}
-                        className="flex items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2 dark:border-slate-800"
-                      >
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <Globe className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-600" />
-                          <div className="min-w-0">
-                            <p className="truncate font-mono text-[11px] text-slate-700 dark:text-slate-300">{source.domain}</p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-600">{source.date}</p>
-                          </div>
-                        </div>
-                        <span
-                          className={cn(
-                            "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium",
-                            source.trust >= 70
-                              ? "bg-emerald-600/10 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
-                              : "bg-rose-600/10 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400"
-                          )}
-                        >
-                          {source.trust}/100
-                        </span>
-                      </div>
-                    ))}
+                        className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded-full bg-slate-900 shadow-[0_0_0_2px_white] dark:bg-white dark:shadow-[0_0_0_2px_theme(colors.slate.950)]"
+                        style={{ left: `calc(${result.verdict.score}% - 2px)` }}
+                        aria-hidden
+                      />
+                    </div>
+                    <div className="mt-1.5 flex justify-between font-mono text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                      <span>Authentic</span>
+                      <span>Context Mismatch</span>
+                      <span>Manipulated</span>
+                    </div>
+
+                    {result.summary && (
+                      <p className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                        {result.summary}
+                      </p>
+                    )}
+
+                    {/* Telemetry info */}
+                    <div className="flex gap-4 text-[11px] font-mono text-slate-500 mt-4 border-t border-slate-200 dark:border-slate-800 pt-4">
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Latency: {result.telemetry.latency}</span>
+                      <span className="flex items-center gap-1"><Cpu className="w-3 h-3" /> Model: {result.telemetry.model}</span>
+                    </div>
                   </div>
                 )}
+
+                {activeResultTab === 'news' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    {(!result.newsArticles || result.newsArticles.length === 0) ? (
+                      <div className="p-8 text-center bg-white border border-slate-200 rounded-xl text-slate-500 dark:bg-slate-950 dark:border-slate-800 shadow-sm">
+                        No recent news articles found for this context.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3">
+                        {result.newsArticles.map((article, idx) => (
+                          <div key={idx} className="p-4 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition-shadow dark:bg-slate-950 dark:border-slate-800">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-md">
+                                {article.source}
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                {new Date(article.publishedAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-start gap-2">
+                              {article.title} <ExternalLink className="w-3 h-3 shrink-0 mt-1 opacity-50" />
+                            </a>
+                            <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">{article.snippet}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeResultTab === 'factcheck' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    {(!result.factCheckClaims || result.factCheckClaims.length === 0) ? (
+                      <div className="p-8 text-center bg-white border border-slate-200 rounded-xl text-slate-500 dark:bg-slate-950 dark:border-slate-800 shadow-sm">
+                        No existing fact-checks found for this query in the Google Fact Check database.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4">
+                        {result.factCheckClaims.map((fc, idx) => (
+                          <div key={idx} className="p-4 bg-white border border-slate-200 rounded-lg flex flex-col sm:flex-row gap-4 shadow-sm dark:bg-slate-950 dark:border-slate-800">
+                            <div className="flex-1">
+                              <p className="text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Claimed by: {fc.claimant}</p>
+                              <h4 className="text-sm font-medium text-slate-800 dark:text-slate-200 italic border-l-2 border-slate-300 pl-3 py-1">"{fc.claim}"</h4>
+                            </div>
+                            <div className="sm:w-48 flex flex-col items-start sm:items-end gap-1.5 border-t sm:border-t-0 sm:border-l sm:pl-4 border-slate-100 dark:border-slate-800 pt-3 sm:pt-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{fc.publisher}</span>
+                              <span className={cn("px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1", fc.rating.toLowerCase().includes('false') ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300')}>
+                                {fc.rating.toLowerCase().includes('false') ? <ShieldAlert className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
+                                {fc.rating}
+                              </span>
+                              <a href={fc.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mt-1 sm:mt-auto">
+                                View Review <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Raw JSON Debugger */}
+                <div className="mt-8 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
+                  <details className="group">
+                    <summary className="flex items-center justify-between p-3 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <FileJson className="w-4 h-4 text-slate-400 group-open:text-indigo-500" />
+                        View Raw API Payload
+                      </div>
+                      <span className="text-[10px] text-slate-400">Debugging</span>
+                    </summary>
+                    <div className="p-4 bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+                      <pre className="text-[10px] text-emerald-400 overflow-x-auto">
+                        {JSON.stringify(result.rawPayload, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
