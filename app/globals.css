@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    @apply bg-indigo-600/20 dark:bg-indigo-400/30;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-indigo-600 ring-offset-2 ring-offset-slate-50 dark:ring-indigo-400 dark:ring-offset-slate-950;
+  }
+}
+
+@layer utilities {
+  .bg-grid {
+    background-image: var(--grid-image);
+    background-size: 32px 32px;
+  }
+
+  :root {
+    --grid-image: linear-gradient(to right, rgb(226 232 240 / 0.6) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(226 232 240 / 0.6) 1px, transparent 1px);
+  }
+
+  .dark {
+    --grid-image: linear-gradient(to right, rgb(30 41 59 / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(30 41 59 / 0.5) 1px, transparent 1px);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
