@@ -466,7 +466,7 @@ export function VerificationSandbox() {
                     )}
                   </div>
                 )}
-                
+
                 {/* Raw JSON Debugger */}
                 <div className="mt-8 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
                   <details className="group">
