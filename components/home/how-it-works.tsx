@@ -27,16 +27,16 @@ const STEPS = [
   },
 ];
 
-export function Architecture() {
+export function HowItWorks() {
   return (
-    <section id="architecture" className="border-b border-slate-200 dark:border-slate-800">
+    <section id="how-it-works" className="border-b border-slate-200 dark:border-slate-800">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <div className="max-w-2xl">
           <p className="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500">
-            Documentation
+            How it works
           </p>
           <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
-            Gemma 4 technical architecture
+            From raw upload to cited verdict
           </h2>
         </div>
 

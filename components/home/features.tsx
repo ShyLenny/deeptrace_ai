@@ -29,10 +29,10 @@ export function Features() {
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <div className="max-w-2xl">
           <p className="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500">
-            Multimodal Engine
+            Platform
           </p>
           <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
-            Architectural capabilities
+            Everything a trust &amp; safety team needs, in one verdict
           </h2>
         </div>
 

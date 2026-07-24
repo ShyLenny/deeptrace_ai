@@ -1,21 +1,27 @@
-import { SiteHeader } from "@/components/site-header";
-import { Hero } from "@/components/hero";
-import { Features } from "@/components/features";
-import { Vectors } from "@/components/vectors";
-import { Architecture } from "@/components/architecture";
-import { SiteFooter } from "@/components/site-footer";
+import { Hero } from "@/components/home/hero";
+import { SupportedMedia } from "@/components/home/supported-media";
+import { Features } from "@/components/home/features";
+import { HowItWorks } from "@/components/home/how-it-works";
+import { Testimonials } from "@/components/home/testimonials";
+import { CtaBand } from "@/components/marketing/cta-band";
+
+export const dynamic = "force-dynamic";
 
 export default function Home() {
   return (
-    <>
-      <SiteHeader />
-      <main>
-        <Hero />
-        <Features />
-        <Vectors />
-        <Architecture />
-      </main>
-      <SiteFooter />
-    </>
+    <main>
+      <Hero />
+      <SupportedMedia />
+      <Features />
+      <HowItWorks />
+      <Testimonials />
+      <CtaBand
+        eyebrow="Get started"
+        title="Verify your first piece of media in under a minute."
+        body="No credit card required. Run the sandbox, connect the API, or talk to our team about a pilot."
+        primary={{ label: "Launch Live Verification", href: "/dashboard" }}
+        secondary={{ label: "Talk to Sales", href: "/contact" }}
+      />
+    </main>
   );
 }
